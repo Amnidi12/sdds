@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# SQLAlchemy relationship() string forward-references across model modules
+# (User <-> Organization) are resolved at mapper-configuration time, not at
+# module-parse time, so ruff's static F821 check is a false positive here.
+"app/organizations/models.py" = ["F821"]
+"app/users/models.py" = ["F821"]
+
+[tool.black]
+line-length = 110
+target-version = ["py312"]

@@ -1,0 +1,93 @@
+# =============================================================================
+# SDDT — Production Docker Compose
+# =============================================================================
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# Security differences from docker-compose.yml (dev):
+#   - Postgres port NOT exposed to the host
+#   - Automated daily/weekly/monthly-retained backups
+#   - restart: always policies
+#   - Production env vars
+# =============================================================================
+
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sddt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-sddt}
+    # Port NOT exposed to host in production (security)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sddt}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-sddt}
+      POSTGRES_USER: ${POSTGRES_USER:-sddt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_NUM_KEEP: 7          # keep 7 daily backups
+      BACKUP_DIR: /backups
+    volumes:
+      - postgres_backups:/backups
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    restart: always
+    env_file:
+      - ./apps/api/.env
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sddt}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sddt}
+      REDIS_URL: redis://redis:6379/0
+      COOKIE_SECURE: "true"
+    ports:
+      - "8080:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - api_uploads:/app/uploads
+
+  web:
+    build:
+      context: ./apps/web
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  postgres_backups:
+  api_uploads:

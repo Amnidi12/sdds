@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: sddt-api
+    env: docker
+    region: ohio
+    plan: free
+    dockerContext: ./apps/api
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /health/live
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_REGION
+        sync: false
