@@ -14,6 +14,8 @@ import uuid
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from app.core.config import get_settings
+
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -70,12 +72,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         if "xsrf-token" not in request.cookies:
+            settings = get_settings()
             response.set_cookie(
                 "xsrf-token",
                 str(uuid.uuid4()),
                 httponly=False,  # JS needs to read it
-                secure=request.url.scheme == "https",
-                samesite="lax",
+                secure=settings.COOKIE_SECURE,
+                samesite="none" if settings.COOKIE_SECURE else "lax",
                 path="/"
             )
 
