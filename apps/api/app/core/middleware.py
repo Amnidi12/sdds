@@ -64,10 +64,18 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             csrf_header = request.headers.get("x-xsrf-token")
 
             if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
-                return JSONResponse(
-                    status_code=403,
-                    content={"error": {"code": "CSRF_ERROR", "message": "CSRF token mismatch"}}
-                )
+                # Fallback for cross-domain deployments (Render + Vercel):
+                # The frontend JS cannot read the xsrf-token cookie set by another domain.
+                # In this case, we validate the Origin header against our trusted CORS origins.
+                origin = request.headers.get("origin")
+                settings = get_settings()
+                if origin and origin in settings.CORS_ORIGINS:
+                    pass  # Trusted origin, allow request
+                else:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"error": {"code": "CSRF_ERROR", "message": "CSRF token mismatch"}}
+                    )
 
         response = await call_next(request)
 
